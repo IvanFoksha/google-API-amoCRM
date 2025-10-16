@@ -43,6 +43,16 @@ class AmoCRMClient:
         """Обновляет существующую сделку."""
         return await self._make_request("PATCH", f"leads/{lead_id}", data=lead_data)
 
+    async def create_note(self, lead_id: int, note_text: str) -> Optional[Dict[str, Any]]:
+        """Создает текстовое примечание к сделке."""
+        note_data = [{
+            "note_type": "common",
+            "params": {
+                "text": note_text
+            }
+        }]
+        return await self._make_request("POST", f"leads/{lead_id}/notes", data=note_data)
+
     @staticmethod
     def format_custom_fields(fields: Dict[str, Any]) -> list:
         """
