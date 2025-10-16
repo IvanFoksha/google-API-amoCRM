@@ -9,7 +9,7 @@ dependencies = [
     "uvicorn[standard]",
     "python-dotenv",
     "gspread",
-    "oauth2client",
+    "google-auth",
     "httpx",
     "apscheduler",
 ]
