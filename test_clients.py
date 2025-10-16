@@ -59,25 +59,5 @@ async def main():
                 print(f"ОШИБКА при работе с Google Sheets: {e}")
                 print(f"Тип ошибки: {type(e).__name__}, Полное представление: {repr(e)}")
 
-    print("\n--- 2. Тестирование клиента amoCRM ---")
-    if not amocrm_subdomain or not amocrm_token:
-        print("ОШИБКА: AMOCRM_SUBDOMAIN или AMOCRM_INTEGRATION_TOKEN не установлены в .env файле.")
-    else:
-        try:
-            print(f"Инициализация клиента amoCRM для субдомена: {amocrm_subdomain}...")
-            amo_client = AmoCRMClient()
-            
-            print("Попытка создать тестовую сделку...")
-            create_payload = {"name": "Тестовая сделка из скрипта", "price": 12345}
-            response_data = await amo_client.create_lead(create_payload)
-            
-            if response_data and "_embedded" in response_data:
-                lead_id = response_data["_embedded"]["leads"][0]["id"]
-                print(f"УСПЕХ: Создана сделка с ID: {lead_id}")
-            else:
-                print("ОШИБКА: Не удалось создать сделку. Ответ от API:", response_data)
-        except Exception as e:
-            print(f"ОШИБКА при работе с amoCRM: {e}")
-
 if __name__ == "__main__":
     asyncio.run(main())
