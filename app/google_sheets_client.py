@@ -8,12 +8,12 @@ import gspread
 class GoogleSheetsClient:
     """Класс для взаимодействия с Google Sheets API."""
 
-    def __init__(self, sheet_id: str):
+    def __init__(self, sheet_id: str, creds_path: str):
         self.sheet_id = sheet_id
-        self.creds_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        self.creds_path = creds_path
         
         if not self.sheet_id or not self.creds_path:
-            raise ValueError("Переменные GOOGLE_SHEET_NAME или GOOGLE_APPLICATION_CREDENTIALS не установлены.")
+            raise ValueError("ID таблицы и путь к файлу ключа должны быть предоставлены.")
             
         if not os.path.exists(self.creds_path):
             raise FileNotFoundError(f"Файл ключа '{self.creds_path}' не найден.")
@@ -21,8 +21,10 @@ class GoogleSheetsClient:
         self.client = self._connect()
         if self.client:
             self.spreadsheet = self.client.open_by_key(self.sheet_id)
+            self.worksheet = self.get_worksheet()  # <- Инициализируем рабочий лист здесь
         else:
             self.spreadsheet = None
+            self.worksheet = None  # <- И здесь тоже
 
     def _connect(self):
         """Инициализирует подключение к Google Sheets."""
@@ -51,24 +53,35 @@ class GoogleSheetsClient:
             return worksheet.get_all_records()
         return []
 
+    def get_worksheet_header(self) -> list[str]:
+        """Возвращает заголовки (первую строку) листа."""
+        try:
+            return self.worksheet.row_values(1)
+        except Exception:
+            return []
+
+    def find_row_by_id(self, lead_id: int) -> tuple[int | None, dict | None]:
+        """Находит номер строки и ее данные по значению в колонке 'lead_id'."""
+        if not self.worksheet:
+            return None, None
+        try:
+            cell = self.worksheet.find(str(lead_id), in_column=1)
+            if not cell:
+                return None, None
+            
+            # -2 потому что get_all_records() это список (0-индекс), а header не считается
+            row_data = self.worksheet.get_all_records()[cell.row - 2]
+            return cell.row, row_data
+        except gspread.CellNotFound:  # <- Исправлено имя ошибки
+            print(f"  -> Не найдена строка с lead_id {lead_id}")
+            return None, None
+        except Exception as e:
+            print(f"  -> Ошибка при поиске строки с lead_id {lead_id}: {e}")
+            return None, None
+
     def update_cell(self, row: int, col: int, value: str, sheet_name: str = "Лист1"):
         """Обновляет значение в конкретной ячейке."""
         worksheet = self.get_worksheet(sheet_name)
         if worksheet:
             worksheet.update_cell(row, col, value)
             print(f"Ячейка ({row}, {col}) обновлена значением '{value}'.")
-
-    def find_row_by_id(self, lead_id: int, id_column_name: str = "lead_id", sheet_name: str = "Лист1"):
-        """Находит номер строки по ID сделки."""
-        worksheet = self.get_worksheet(sheet_name)
-        if not worksheet:
-            return None
-        try:
-            # gspread.CellNotFound - это нормальное поведение, обрабатываем его.
-            cell = worksheet.find(str(lead_id), in_column=1) # Ищем в первой колонке
-            return cell.row if cell else None
-        except gspread.exceptions.CellNotFound:
-            return None # Явный возврат, если ячейка не найдена
-        except Exception as e:
-            print(f"Произошла ошибка при поиске lead_id={lead_id}: {e}")
-            return None

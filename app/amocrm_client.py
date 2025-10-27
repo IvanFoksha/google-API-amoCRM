@@ -1,31 +1,33 @@
 import os
 import httpx
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union, List
 
 class AmoCRMClient:
     """Асинхронный клиент для работы с API amoCRM v4."""
 
-    def __init__(self):
-        self.subdomain = os.getenv("AMOCRM_SUBDOMAIN")
-        self.token = os.getenv("AMOCRM_INTEGRATION_TOKEN")
+    def __init__(self, subdomain: str, token: str):
+        if not subdomain or not token:
+            raise ValueError("Субдомен и токен amoCRM должны быть предоставлены.")
 
-        if not self.subdomain or not self.token:
-            raise ValueError("AMOCRM_SUBDOMAIN и AMOCRM_INTEGRATION_TOKEN должны быть установлены.")
-
-        self.base_url = f"https://{self.subdomain}.amocrm.ru/api/v4"
+        self.base_url = f"https://{subdomain}.amocrm.ru/api/v4/"
         self.headers = {
-            "Authorization": f"Bearer {self.token}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
 
     async def _make_request(
-        self, method: str, endpoint: str, params: Optional[Dict] = None, data: Optional[Dict] = None
+        self,
+        method: str,
+        endpoint: str,
+        data: Optional[Union[Dict, List]] = None,
+        params: Optional[Dict] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Вспомогательный метод для выполнения асинхронных запросов."""
+        """Внутренний метод для выполнения запросов к API."""
+        url = f"{self.base_url}{endpoint}"
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.request(
-                    method, f"{self.base_url}/{endpoint}", headers=self.headers, params=params, json=data
+                    method, url, json=data, params=params, headers=self.headers
                 )
                 response.raise_for_status()
                 return response.json()
@@ -35,8 +37,13 @@ class AmoCRMClient:
                 print(f"Произошла ошибка при запросе к amoCRM: {e}")
         return None
 
+    async def get_lead(self, lead_id: int) -> Optional[Dict[str, Any]]:
+        """Получает данные сделки по ее ID с дополнительными полями."""
+        params = {"with": "contacts"}
+        return await self._make_request("GET", f"leads/{lead_id}", params=params)
+
     async def create_lead(self, lead_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Создает новую сделку."""
+        """Создает одну новую сделку."""
         return await self._make_request("POST", "leads", data=[lead_data])
 
     async def update_lead(self, lead_id: int, lead_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
