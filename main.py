@@ -1,15 +1,14 @@
 import asyncio
+import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, BackgroundTasks
-from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # Импортируем обе наши функции синхронизации
 from app.sync_amo_to_sheets import process_webhook
 from app.sync_sheets_to_amo import run_sheets_to_amo_sync
 
-# Загружаем переменные окружения
-load_dotenv()
+# Загрузка переменных окружения теперь происходит в app.config
 
 scheduler = AsyncIOScheduler()
 
@@ -44,20 +43,44 @@ async def root():
 async def handle_amocrm_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Эндпоинт для приема вебхуков от amoCRM.
-    Добавляет задачу обработки вебхука в фон, чтобы не блокировать ответ.
+    Обрабатывает данные как в формате JSON, так и в виде данных формы.
     """
-    try:
-        data = await request.json()
-        background_tasks.add_task(process_webhook, data)
-        # print("Webhook received:", data) # Временный вывод можно убрать
-        return {"status": "success", "message": "Webhook received"}
-    except Exception as e:
-        print(f"Error processing webhook: {e}")
-        return {"status": "error", "message": "Invalid data format"}
+    data = None
+    content_type = request.headers.get('content-type', '')
 
-# --- Блок для ручного тестирования синхронизации ---
-# Этот блок больше не нужен, т.к. синхронизация теперь автоматическая
-# if __name__ == "__main__":
-#     print("Запуск синхронизации в ручном режиме...")
-#     asyncio.run(run_sheets_to_amo_sync())
-#     print("Синхронизация завершена.")
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+        except Exception:
+            pass  # Ошибка будет обработана ниже
+
+    elif "application/x-www-form-urlencoded" in content_type:
+        form_data = await request.form()
+        
+        reconstructed_data = {}
+        for key, value in form_data.items():
+            match = re.match(r"(\w+)\[(\w+)\]\[(\d+)\]\[(\w+)\]", key)
+            if match:
+                top_key, event_type, index_str, field_name = match.groups()
+                index = int(index_str)
+                
+                reconstructed_data.setdefault(top_key, {}).setdefault(event_type, [])
+                
+                while len(reconstructed_data[top_key][event_type]) <= index:
+                    reconstructed_data[top_key][event_type].append({})
+                
+                reconstructed_data[top_key][event_type][index][field_name] = value
+        data = reconstructed_data
+
+    if data:
+        background_tasks.add_task(process_webhook, data)
+        return {"status": "accepted"}
+    else:
+        # В случае, если данные не распознаны, логируем и возвращаем ошибку
+        body = await request.body()
+        print(f"CRITICAL: Could not parse webhook data. Raw body: {body.decode('utf-8')}")
+        return {"status": "error", "message": "Could not parse webhook data"}
+
+
+# Блок для ручного запуска был убран. 
+# Теперь файл предназначен для запуска через uvicorn в качестве сервера.

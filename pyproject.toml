@@ -6,13 +6,16 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi",
-    "uvicorn[standard]",
+    "uvicorn",
     "python-dotenv",
     "gspread",
     "oauth2client",
     "httpx",
     "apscheduler",
+    "python-multipart"
 ]
+
+[project.optional-dependencies]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
