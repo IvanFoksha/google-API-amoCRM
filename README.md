@@ -2,7 +2,7 @@
 
 Этот проект реализует автоматическую двухстороннюю синхронизацию данных между amoCRM и Google Sheets с использованием FastAPI.
 
-**Автор**: `ваше_имя`
+**Автор**: Ivan Foksha
 **Стек**: Python, FastAPI, Gspread, HTTPL, APScheduler
 
 ---
