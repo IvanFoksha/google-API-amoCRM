@@ -2,11 +2,20 @@ import os
 import asyncio
 from app.google_sheets_client import GoogleSheetsClient
 from app.amocrm_client import AmoCRMClient
+from app.config import (
+    GOOGLE_SHEET_ID,
+    GOOGLE_APPLICATION_CREDENTIALS,
+    AMOCRM_SUBDOMAIN,
+    AMOCRM_INTEGRATION_TOKEN
+)
 
-# ID воронки и статуса, куда будут падать новые сделки.
-# ЗАМЕНИТЕ ИХ НА ВАШИ РЕАЛЬНЫЕ ID.
-PIPELINE_ID = 10203662 # Пример
-STATUS_ID = 63688174   # Пример
+# ID воронки и статуса в amoCRM, куда будут добавляться сделки.
+# ЗАМЕНИТЕ ЭТИ ЗНАЧЕНИЯ на ID из вашей amoCRM.
+PIPELINE_ID = 10215450
+STATUS_ID = 80874938
+
+# ID кастомных полей (если они есть).
+# ЗАМЕНИТЕ ЭТИ ЗНАЧЕНИЯ на ID полей из вашей amoCRM.
 
 
 def _prepare_lead_data(row: dict) -> dict:
@@ -19,8 +28,8 @@ def _prepare_lead_data(row: dict) -> dict:
 def _prepare_note_text(row: dict, is_update: bool = False) -> str:
     """Формирует текст примечания с контактными данными."""
     header = "Обновленные контактные данные:" if is_update else "Контактные данные из Google Sheets:"
-    phone = row.get('Телефон', 'не указан')
-    email = row.get('Email', 'не указан')
+    phone = row.get('Телефон (Контакт)', 'не указан')
+    email = row.get('Email (Контакт)', 'не указан')
     return f"{header}\nТелефон: {phone}\nEmail: {email}"
 
 
@@ -31,8 +40,14 @@ async def run_sheets_to_amo_sync():
     """
     print("--- Запуск синхронизации Google Sheets -> amoCRM ---")
     
-    gs_client = GoogleSheetsClient(sheet_id=os.getenv("GOOGLE_SHEET_NAME"))
-    amo_client = AmoCRMClient()
+    gs_client = GoogleSheetsClient(
+        sheet_id=GOOGLE_SHEET_ID,
+        creds_path=GOOGLE_APPLICATION_CREDENTIALS
+    )
+    amo_client = AmoCRMClient(
+        subdomain=AMOCRM_SUBDOMAIN,
+        token=AMOCRM_INTEGRATION_TOKEN
+    )
     
     records = gs_client.get_all_records()
     if not records:
